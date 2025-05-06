@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="html">
+<head>
+    <title>队列显示</title>
+    <meta charset="UTF-8">
+    <meta name="referrer" content="never">
+</head>
+<body>
+<a id="LineSize">当前队列人数</a>
+<div id="MergedLine" class="Line MergedLine"></div>
+<a id="bottomTag"></a>
+
+<script>
+    const messageQueue = [];
+    let isProcessing = false;
+    let lastProcessedGifts = {};
+    let socket = null;
+    let reconnectTimer = null;
+    let globalCounter = 1;
+    let debounceTimer;
+    let scrollPositions = {};
+    const RECONNECT_INTERVAL = 5000;
+
+    function cleanAllUsers() {
+        const mergedLine = document.getElementById('MergedLine');
+        mergedLine && (mergedLine.innerHTML = '');
+    }
+
+    function debounce(func, delay) {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(func, delay);
+    }
+
+    function saveScrollPositions() {
+        const MergedLineDiv = document.getElementById('MergedLine');
+        if (MergedLineDiv) {
+            scrollPositions = { merged: MergedLineDiv.scrollTop };
+        }
+    }
+    
+    function restoreScrollPositions() {
+        const MergedLineDiv = document.getElementById('MergedLine');
+        if (MergedLineDiv && scrollPositions.merged !== undefined) {
+            MergedLineDiv.scrollTop = scrollPositions.merged;
+        }
+    }
+
+    function formatNumber(num) {
+        if (!num) return 0;
+        num = parseInt(num);
+        if (num >= 100000) return (num / 10000).toFixed(1) + 'w';
+        if (num >= 1000) return (num / 1000).toFixed(1) + 'k';
+        return num;
+    }
+
+    function parseFormattedNumber(str) {
+        if (!str) return 0;
+        if (str.includes('w')) return parseFloat(str) * 10000;
+        if (str.includes('k')) return parseFloat(str) * 1000;
+        return parseInt(str);
+    }
+
+    function setupAutoScroll() {
+        const pixelsPerSecond = 30;
+        const frameRate = 30;
+        const pxPerFrame = pixelsPerSecond / frameRate;
+        let scrollInterval;
+        let direction = 1;
+        let isScrolling = false;
+        let isPaused = false;
+        const MergedLineDiv = document.getElementById('MergedLine');
+
+        function shouldScroll(container) {
+            return container && container.scrollHeight > container.clientHeight + 1;
+        }
+
+        function startAutoScroll() {
+            if (scrollInterval) clearInterval(scrollInterval);
+            
+            if (!MergedLineDiv || !shouldScroll(MergedLineDiv)) {
+                MergedLineDiv && (MergedLineDiv.scrollTop = 0);
+                return;
+            }
+            
+            scrollInterval = setInterval(() => {
+                if (isScrolling || isPaused || !MergedLineDiv) return;
+                
+                isScrolling = true;
+                const atTop = MergedLineDiv.scrollTop <= 1;
+                const atBottom = MergedLineDiv.scrollTop + MergedLineDiv.clientHeight >= 
+                                MergedLineDiv.scrollHeight - 1;
+                
+                if (atTop) direction = 1;
+                if (atBottom) direction = -1;
+                
+                const remainingSpace = direction > 0 
+                    ? MergedLineDiv.scrollHeight - (MergedLineDiv.scrollTop + MergedLineDiv.clientHeight)
+                    : MergedLineDiv.scrollTop;
+                    
+                const scrollAmount = Math.min(pxPerFrame, remainingSpace);
+                
+                MergedLineDiv.scrollTop += direction * scrollAmount;
+                isScrolling = false;
+            }, 1000 / frameRate);
+        }
+
+        if (!MergedLineDiv) return;
+
+        const resizeObserver = new ResizeObserver(() => {
+            if (!isPaused) startAutoScroll();
+        });
+        resizeObserver.observe(MergedLineDiv);
+
+        MergedLineDiv.addEventListener('mouseenter', () => {
+            isPaused = true;
+            scrollInterval && clearInterval(scrollInterval);
+        });
+        
+        MergedLineDiv.addEventListener('mouseleave', () => {
+            isPaused = false;
+            setTimeout(startAutoScroll, 100);
+        });
+
+        startAutoScroll();
+    }
+
+    function handleOverflow() {
+        const MergedLineDiv = document.getElementById('MergedLine');
+        if (!MergedLineDiv) return;
+
+        const scrollHeightBefore = MergedLineDiv.scrollHeight;
+        const clientHeightBefore = MergedLineDiv.clientHeight;
+        
+        const shouldSave = scrollHeightBefore > clientHeightBefore;
+        if (shouldSave) saveScrollPositions();
+        
+        MergedLineDiv.style.display = 'none';
+        MergedLineDiv.offsetHeight;
+        MergedLineDiv.style.display = '';
+        
+        document.querySelectorAll('.user').forEach(user => user.classList.remove('hidden'));
+        
+        const scrollHeightAfter = MergedLineDiv.scrollHeight;
+        const clientHeightAfter = MergedLineDiv.clientHeight;
+        
+        MergedLineDiv.classList.toggle('scrollable', scrollHeightAfter > clientHeightAfter);
+        
+        if (!MergedLineDiv.classList.contains('scrollable')) {
+            MergedLineDiv.scrollTop = 0;
+        }
+        
+        if (shouldSave) {
+            setTimeout(() => {
+                restoreScrollPositions();
+                const atBottom = MergedLineDiv.scrollTop + MergedLineDiv.clientHeight >= 
+                               MergedLineDiv.scrollHeight - 10;
+                if (!atBottom && scrollHeightAfter > clientHeightAfter) {
+                    MergedLineDiv.scrollTop = MergedLineDiv.scrollHeight;
+                }
+            }, 0);
+        }
+    }
+
+    function createUserElement(userData, isGift) {
+        const userDiv = document.createElement('div');
+        userDiv.className = `user ${isGift ? 'Gift' : 'Normal'}`;
+        userDiv.setAttribute("OpenID", userData.open_id);
+        userDiv.setAttribute("data-index", globalCounter++);
+
+        const img = document.createElement('img');
+        img.src = userData.Avatar || 'data:image/svg+xml;charset=UTF-8,%3Csvg xmlns="http://www.w3.org/2000/svg" width="150" height="150" viewBox="0 0 150 150"%3E%3Crect width="150" height="150" fill="%23f0f0f0"/%3E%3Ctext x="50%" y="50%" font-family="Arial" font-size="50" text-anchor="middle" dominant-baseline="middle" fill="%23aaa"%3E头像%3C/text%3E%3C/svg%3E';
+        img.onerror = () => img.src = 'data:image/svg+xml;charset=UTF-8,%3Csvg xmlns="http://www.w3.org/2000/svg" width="150" height="150" viewBox="0 0 150 150"%3E%3Crect width="150" height="150" fill="%23f0f0f0"/%3E%3Ctext x="50%" y="50%" font-family="Arial" font-size="50" text-anchor="middle" dominant-baseline="middle" fill="%23aaa"%3E头像%3C/text%3E%3C/svg%3E';
+
+        const infoContainer = document.createElement('div');
+        infoContainer.className = 'user-info-container';
+        
+        const userNameTag = document.createElement('span');
+        userNameTag.className = 'user-name';
+        userNameTag.textContent = userData.UserName;
+
+        const statusLabel = document.createElement('span');
+        statusLabel.className = 'status-label';
+        statusLabel.textContent = userData.is_online ? '' : '(不在)';
+
+        infoContainer.appendChild(userNameTag);
+        userDiv.appendChild(img);
+        userDiv.appendChild(infoContainer);
+        userDiv.appendChild(statusLabel);
+
+        if (isGift && userData.GiftPrice > 0) {
+            const giftPriceContainer = document.createElement('span');
+            giftPriceContainer.className = 'gift-price';
+            
+            const priceValue = document.createElement('span');
+            priceValue.className = 'price-value';
+            priceValue.textContent = formatNumber(userData.GiftPrice);
+            
+   // 在createUserElement和updateUserElement函数中替换以下内容：
+const batteryIcon = document.createElement('img');
+batteryIcon.className = 'battery-icon';
+batteryIcon.src = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAYAAABXAvmHAAAAAXNSR0IArs4c6QAABDBJREFUaAXVWt1rFFcU/92Z3Z3sJiHRxBhNRe0ihSLSF20fBBWDL/og2Pf+A774IKGU0gXf2jcf/RMsQkXwg4IgVKxUUBB9SJssRtGQaLr52J1sZmduz93qujt752Nn713WE8jOPeeee36/O+d+zQzwiQtThZ8/K2QwZBxAzctGtmlhDVP4h7GCF1k3okIqwh7LzDmBL+Iv1NxDsRyqVKvIrtH/b2PVD6lkhNjimxaMw+A8HvgPrXJ+jhcLox+KSX/VEPC84UQA0hhK5NfkpIZAU4O9vow1Bji/auLN822B4KpsBOCB5kDDFrbz14VNqd3LcEx9v8IYC204dBbi85e+ANzLFOAo5XhOGkinkrES9ctNDOICmywsyUIFEuALl/Jw3CfUs13nqSxwRzrGijRaDrGJwobfLziFHPdnZeANC8hM+GO3l70twFmlsL6s4nw/1tlFcvjJ7xRMQKSNKjEHgaGD8Vuz54HyLNVvSX8pnpBZiMfosviYOqqZ/RzI7vO7SPGEEPD797icy8cK2L8EWBpgA5Ek+peAgG6Y/UHAfvMrSn8ew9bynUhAnVbQfgectafYXPkD3KvCeXe3U3yR9bUS4LV1VJZvNkAY1njjWtWFVgLlpRvw3I+LkpGZVIW70Y42Altrj+Fs/N0IJC4Ma2dLWUVBCwGvtorK0u02fIa1q03XrUIDAY7K4nUatLSv8ckncQeqq4/gVIo+6LQmMRMs0+eD2HNWYC//3gZeKAxLbGXU33CFLXKUF3+j1HHkBDTMQPWOkUZLoKz++wA1+2Wgp2GJKdSDV5mjFfk2PLs9zQKdQwxh54EQt1YTdzdgvw1fZZ3SQ5QeToO7lbozM3MYPXxL5FZrYx2WFBGw6cjsNkIbBIqLv6aZSIyPZmHikGPQjrNLUULAyOzA8GffQcz/qYHdMGi2WV+4gtrmYiC8XH6GbN0PQSUEBMpUbp/4aYgnzrYBYk2cQXqb9IQY4BGs7r4LZG1zh/ZAtsxS307k9l+Q2pIotRAI6n3xDGcw/wMg8l+RaCJQksKzJs8hNXpEakuq1EOABrNfzIEpZPee96u7LveEAAND7sCPlDrR7z46ZaSHgG8GssaOIzX8VafYYtXXTsCkNSE7cToWmCSV9BBw1+pYROoM7jqrZMUNIqeFQHroS4JOTwfHT8K0poJiK9ErW4mb0WTHp5EdO0GnmOgHU81+Sa613IE6EBXgefRbWH0EknRnsw9tR+jQ0KyRXvcvAcm5WsYghABbljn0RGe/AOw5fygpnrBBfJ9aoDlQgdTK9MbleXRD4gAktiHvT20tDgwCT5uEEZihZyGnlLyd5PRtgejVxMIWMIJfZO6BKcTyhVmk8DWRuEfzYftTKllrqnWMlSn+NZjpb9hY4f/V0ReD+crSYv1jjlepHVKjLiWvcezBYtQXLf8BGOoetC6LwK8AAAAASUVORK5CYII=';
+            giftPriceContainer.appendChild(priceValue);
+            giftPriceContainer.appendChild(batteryIcon);
+            giftPriceContainer.style.display = userData.is_online ? "flex" : "none";
+            infoContainer.appendChild(giftPriceContainer);
+        }
+
+        return userDiv;
+    }
+
+    function updateUserElement(existingUser, userData, isGift) {
+        const userNameTag = existingUser.querySelector('.user-name');
+        const statusLabel = existingUser.querySelector('.status-label');
+        const img = existingUser.querySelector('img');
+        const infoContainer = existingUser.querySelector('.user-info-container');
+        
+        userNameTag && (userNameTag.textContent = userData.UserName);
+        statusLabel && (statusLabel.textContent = userData.is_online ? '' : '(不在)');
+        img && (img.src = userData.Avatar);
+
+        // 处理礼物信息
+        let giftPriceContainer = existingUser.querySelector('.gift-price');
+        
+        if (isGift && userData.GiftPrice > 0) {
+            if (!giftPriceContainer) {
+                giftPriceContainer = document.createElement('span');
+                giftPriceContainer.className = 'gift-price';
+                infoContainer.appendChild(giftPriceContainer);
+            }
+            
+            giftPriceContainer.innerHTML = '';
+            
+            const priceValue = document.createElement('span');
+            priceValue.className = 'price-value';
+            priceValue.textContent = formatNumber(userData.GiftPrice);
+            
+ // 在createUserElement和updateUserElement函数中替换以下内容：
+const batteryIcon = document.createElement('img');
+batteryIcon.className = 'battery-icon';
+batteryIcon.src = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAYAAABXAvmHAAAAAXNSR0IArs4c6QAABDBJREFUaAXVWt1rFFcU/92Z3Z3sJiHRxBhNRe0ihSLSF20fBBWDL/og2Pf+A774IKGU0gXf2jcf/RMsQkXwg4IgVKxUUBB9SJssRtGQaLr52J1sZmduz93qujt752Nn713WE8jOPeeee36/O+d+zQzwiQtThZ8/K2QwZBxAzctGtmlhDVP4h7GCF1k3okIqwh7LzDmBL+Iv1NxDsRyqVKvIrtH/b2PVD6lkhNjimxaMw+A8HvgPrXJ+jhcLox+KSX/VEPC84UQA0hhK5NfkpIZAU4O9vow1Bji/auLN822B4KpsBOCB5kDDFrbz14VNqd3LcEx9v8IYC204dBbi85e+ANzLFOAo5XhOGkinkrES9ctNDOICmywsyUIFEuALl/Jw3CfUs13nqSxwRzrGijRaDrGJwobfLziFHPdnZeANC8hM+GO3l70twFmlsL6s4nw/1tlFcvjJ7xRMQKSNKjEHgaGD8Vuz54HyLNVvSX8pnpBZiMfosviYOqqZ/RzI7vO7SPGEEPD797icy8cK2L8EWBpgA5Ek+peAgG6Y/UHAfvMrSn8ew9bynUhAnVbQfgectafYXPkD3KvCeXe3U3yR9bUS4LV1VJZvNkAY1njjWtWFVgLlpRvw3I+LkpGZVIW70Y42Altrj+Fs/N0IJC4Ma2dLWUVBCwGvtorK0u02fIa1q03XrUIDAY7K4nUatLSv8ckncQeqq4/gVIo+6LQmMRMs0+eD2HNWYC//3gZeKAxLbGXU33CFLXKUF3+j1HHkBDTMQPWOkUZLoKz++wA1+2Wgp2GJKdSDV5mjFfk2PLs9zQKdQwxh54EQt1YTdzdgvw1fZZ3SQ5QeToO7lbozM3MYPXxL5FZrYx2WFBGw6cjsNkIbBIqLv6aZSIyPZmHikGPQjrNLUULAyOzA8GffQcz/qYHdMGi2WV+4gtrmYiC8XH6GbN0PQSUEBMpUbp/4aYgnzrYBYk2cQXqb9IQY4BGs7r4LZG1zh/ZAtsxS307k9l+Q2pIotRAI6n3xDGcw/wMg8l+RaCJQksKzJs8hNXpEakuq1EOABrNfzIEpZPee96u7LveEAAND7sCPlDrR7z46ZaSHgG8GssaOIzX8VafYYtXXTsCkNSE7cToWmCSV9BBw1+pYROoM7jqrZMUNIqeFQHroS4JOTwfHT8K0poJiK9ErW4mb0WTHp5EdO0GnmOgHU81+Sa613IE6EBXgefRbWH0EknRnsw9tR+jQ0KyRXvcvAcm5WsYghABbljn0RGe/AOw5fygpnrBBfJ9aoDlQgdTK9MbleXRD4gAktiHvT20tDgwCT5uEEZihZyGnlLyd5PRtgejVxMIWMIJfZO6BKcTyhVmk8DWRuEfzYftTKllrqnWMlSn+NZjpb9hY4f/V0ReD+crSYv1jjlepHVKjLiWvcezBYtQXLf8BGOoetC6LwK8AAAAASUVORK5CYII='; 
+            giftPriceContainer.appendChild(priceValue);
+            giftPriceContainer.appendChild(batteryIcon);
+            giftPriceContainer.style.display = userData.is_online ? "flex" : "none";
+            
+            existingUser.classList.add('Gift');
+            existingUser.classList.remove('Normal');
+        } else {
+            if (giftPriceContainer) {
+                giftPriceContainer.style.display = "none";
+            }
+            existingUser.classList.remove('Gift');
+            existingUser.classList.add('Normal');
+        }
+    }
+
+    function sortGiftUsers() {
+        const MergedLineDiv = document.getElementById('MergedLine');
+        if (!MergedLineDiv) return;
+
+        const giftUsers = Array.from(MergedLineDiv.querySelectorAll('.user.Gift'));
+        const normalUsers = Array.from(MergedLineDiv.querySelectorAll('.user.Normal'));
+        
+        giftUsers.sort((a, b) => {
+            const aPriceText = a.querySelector('.price-value')?.textContent || '0';
+            const bPriceText = b.querySelector('.price-value')?.textContent || '0';
+            return parseFormattedNumber(bPriceText) - parseFormattedNumber(aPriceText);
+        });
+        
+        normalUsers.sort((a, b) => {
+            const aIndex = parseInt(a.getAttribute('data-index'));
+            const bIndex = parseInt(b.getAttribute('data-index'));
+            return aIndex - bIndex;
+        });
+        
+        MergedLineDiv.innerHTML = '';
+        giftUsers.forEach(user => MergedLineDiv.appendChild(user));
+        normalUsers.forEach(user => MergedLineDiv.appendChild(user));
+    }
+
+    function updateUserIndexes() {
+        const MergedLineDiv = document.getElementById('MergedLine');
+        if (!MergedLineDiv) return;
+
+        globalCounter = 1;
+        
+        const giftUsers = Array.from(MergedLineDiv.querySelectorAll('.user.Gift'));
+        const normalUsers = Array.from(MergedLineDiv.querySelectorAll('.user.Normal'));
+        
+        giftUsers.forEach(user => user.setAttribute('data-index', globalCounter++));
+        normalUsers.forEach(user => user.setAttribute('data-index', globalCounter++));
+    }
+
+    function updateQueueCount() {
+        const lineSize = document.getElementById('LineSize');
+        lineSize && (lineSize.textContent = "当前队列人数：" + document.querySelectorAll('.user').length);
+    }
+
+    function updateMergedUser(AddStruct) {
+        const MergedLineDiv = document.getElementById('MergedLine');
+        if (!MergedLineDiv) return;
+
+        const userData = AddStruct.LineType === 1 ? AddStruct.GiftLine : AddStruct.Line;
+        if (!userData?.open_id) return;
+        
+        const safeUserData = {
+            open_id: userData.open_id || '',
+            UserName: userData.UserName || '未知用户',
+            Avatar : userData.Avatar || 'data:image/svg+xml;charset=UTF-8,%3Csvg xmlns="http://www.w3.org/2000/svg" width="150" height="150" viewBox="0 0 150 150"%3E%3Crect width="150" height="150" fill="%23f0f0f0"/%3E%3Ctext x="50%" y="50%" font-family="Arial" font-size="50" text-anchor="middle" dominant-baseline="middle" fill="%23aaa"%3E头像%3C/text%3E%3C/svg%3E',
+            is_online: userData.is_online !== false,
+            GiftPrice: userData.GiftPrice || 0,
+            PrintColor: userData.PrintColor || { R: 0, G: 0, B: 0 }
+        };
+
+        const existingUser = document.querySelector(`[OpenID="${safeUserData.open_id}"]`);
+        const isGift = AddStruct.LineType === 1 && safeUserData.GiftPrice > 0;
+        
+        if (existingUser) {
+            updateUserElement(existingUser, safeUserData, isGift);
+        } else {
+            MergedLineDiv.appendChild(createUserElement(safeUserData, isGift));
+        }
+        
+        if (isGift) sortGiftUsers();
+    }
+
+    function delUser(UserStruct) {
+        if (UserStruct?.Line?.open_id) {
+            document.querySelector(`[OpenID="${UserStruct.Line.open_id}"]`)?.remove();
+        }
+        if (UserStruct?.GiftLine?.open_id) {
+            document.querySelector(`[OpenID="${UserStruct.GiftLine.open_id}"]`)?.remove();
+        }
+        updateUserIndexes();
+        updateQueueCount();
+        handleOverflow();
+    }
+
+    function updateUserStatus(data) {
+        if (!data?.OpenID) return;
+        
+        const userDiv = document.querySelector(`[OpenID="${data.OpenID}"]`);
+        if (userDiv) {
+            const statusLabel = userDiv.querySelector('.status-label');
+            const giftPriceContainer = userDiv.querySelector('.gift-price');
+            
+            statusLabel && (statusLabel.textContent = data.is_online ? '' : '(不在)');
+            giftPriceContainer && (giftPriceContainer.style.display = data.is_online ? "flex" : "none");
+            
+            if (userDiv.classList.contains('Gift')) {
+                sortGiftUsers();
+            }
+        }
+    }
+
+    function whereUser(UserStruct) {
+        if (!UserStruct?.Line?.open_id) return;
+        document.querySelector(`[OpenID="${UserStruct.Line.open_id}"]`)?.scrollIntoView({
+            behavior: "smooth", 
+            block: "center", 
+            inline: "center"
+        });
+    }
+
+    function processMessageQueue() {
+        if (messageQueue.length === 0) {
+            isProcessing = false;
+            return;
+        }
+        
+        isProcessing = true;
+        const message = messageQueue.shift();
+        
+        try {
+            if (typeof message === 'string' && message === "Connected") {
+                setTimeout(processMessageQueue, 0);
+                return;
+            }
+
+            let ReceiverJson = JSON.parse(message);
+
+            if (ReceiverJson.open_id && !ReceiverJson.OpMessage && !ReceiverJson.LineType) {
+                ReceiverJson = {
+                    OpMessage: 1,
+                    LineType: 2,
+                    Line: ReceiverJson,
+                    GiftLine: null
+                };
+            }
+
+            if (!ReceiverJson || typeof ReceiverJson !== 'object') {
+                setTimeout(processMessageQueue, 0);
+                return;
+            }
+
+            if (ReceiverJson.OpMessage === 1 && ReceiverJson.LineType === 1) {
+                const giftData = ReceiverJson.GiftLine;
+                const giftKey = `${giftData.open_id}_${Date.now()}`;
+                
+                if (lastProcessedGifts[giftKey]) {
+                    setTimeout(processMessageQueue, 0);
+                    return;
+                }
+                
+                lastProcessedGifts[giftKey] = true;
+                if (Object.keys(lastProcessedGifts).length > 100) {
+                    const keys = Object.keys(lastProcessedGifts);
+                    for (let i = 0; i < 20; i++) {
+                        delete lastProcessedGifts[keys[i]];
+                    }
+                }
+            }
+
+            switch (ReceiverJson.OpMessage) {
+                case 0:
+                    if (ReceiverJson.Line?.open_id || ReceiverJson.GiftLine?.open_id) delUser(ReceiverJson);
+                    break;
+                case 1:
+                    if (ReceiverJson.LineType !== undefined) {
+                        switch (ReceiverJson.LineType) {
+                            case 1:
+                                if (ReceiverJson.GiftLine?.open_id) updateMergedUser(ReceiverJson);
+                                break;
+                            case 2:
+                                if (ReceiverJson.Line?.open_id) {
+                                    updateMergedUser({
+                                        ...ReceiverJson,
+                                        GiftLine: null,
+                                        Line: ReceiverJson.Line
+                                    });
+                                }
+                                break;
+                        }
+                    }
+                    break;
+                case 2:
+                    if (ReceiverJson.Line?.open_id) whereUser(ReceiverJson);
+                    break;
+                case 3:
+                    if (ReceiverJson.Data?.OpenID !== undefined && ReceiverJson.Data?.IsOnline !== undefined) {
+                        updateUserStatus({
+                            OpenID: ReceiverJson.Data.OpenID,
+                            is_online: ReceiverJson.Data.IsOnline
+                        });
+                    }
+                    break;
+            }
+            
+            debounce(() => {
+                updateUserIndexes();
+                updateQueueCount();
+                handleOverflow();
+            }, 100);
+        } catch(e) {
+            console.error('处理消息出错:', e);
+        }
+        
+        setTimeout(processMessageQueue, 0);
+    }
+
+    function connect() {
+        cleanAllUsers();
+        getAllUsers();
+
+        try {
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                socket.close();
+            }
+
+            socket = new WebSocket('ws://127.0.0.1:100/LineWs');
+
+            socket.onopen = () => {
+                lastProcessedGifts = {};
+                setupAutoScroll();
+                reconnectTimer && clearTimeout(reconnectTimer);
+                reconnectTimer = null;
+            };
+
+            socket.onmessage = (event) => {
+                messageQueue.push(event.data);
+                if (!isProcessing) processMessageQueue();
+            };
+
+            socket.onclose = () => {
+                if (!reconnectTimer) {
+                    reconnectTimer = setTimeout(connect, RECONNECT_INTERVAL);
+                }
+            };
+
+            socket.onerror = (error) => {
+                if (!reconnectTimer && (!socket || socket.readyState === WebSocket.CLOSED)) {
+                    reconnectTimer = setTimeout(connect, RECONNECT_INTERVAL);
+                }
+            };
+
+            setInterval(detectingTheNumberOfUsers, 3000);
+
+        } catch (error) {
+            if (!reconnectTimer) {
+                reconnectTimer = setTimeout(connect, RECONNECT_INTERVAL);
+            }
+        }
+    }
+
+    function getConfig() {
+        const Http = new XMLHttpRequest();
+        Http.open("GET", "http://127.0.0.1:100/getConfig");
+        Http.send();
+        Http.onreadystatechange = function() {
+            if (this.readyState === 4 && this.status === 200) {
+                try {
+                    let ConfigJson = JSON.parse(Http.response);
+                    let LineStyle = document.createElement('style');
+                    let GiftPrintColor = ConfigJson.GiftPrintColor;
+                    let CommonPrintColor = ConfigJson.CommonPrintColor;
+
+                    LineStyle.innerHTML = `
+                        :root {
+                            --gift-bg-color: rgb(${GiftPrintColor.R / 255},${GiftPrintColor.G / 255},${GiftPrintColor.B / 255});
+                            --gift-text-color: rgb(${255 - GiftPrintColor.R / 255},${255 - GiftPrintColor.G / 255},${255 - GiftPrintColor.B / 255});
+                            --normal-bg-color: rgb(${CommonPrintColor.R / 255},${CommonPrintColor.G / 255},${CommonPrintColor.B / 255});
+                            --normal-text-color: rgb(${255 - CommonPrintColor.R / 255},${255 - CommonPrintColor.G / 255},${255 - CommonPrintColor.B / 255});
+                        }
+                        .gift-price { display:${ConfigJson.GiftPriceDisplay ? "flex" : "none"}; }
+                        #LineSize{ display:${ConfigJson.CurrentQueueSizeDisplay ? "block" : "none"}; }
+                    `;
+                    document.head.appendChild(LineStyle);
+                } catch (e) {
+                    console.error('解析配置失败:', e);
+                }
+            }
+        };
+    }
+
+    function getCss() {
+        fetch('/default.css')
+            .then(response => response.text())
+            .then(css => {
+                const style = document.createElement('style');
+                style.type = 'text/css';
+                style.appendChild(document.createTextNode(css));
+                document.head.appendChild(style);
+            })
+            .catch(error => console.error('加载CSS失败:', error));
+    }
+
+    function addDataToPage(jsonData) {
+        if (!jsonData) return;
+        const MergedLineDiv = document.getElementById('MergedLine');
+        if (!MergedLineDiv) return;
+
+        globalCounter = 1;
+
+        if (Array.isArray(jsonData.GiftLine)) {
+            jsonData.GiftLine.forEach(item => {
+                if (!item?.open_id) return;
+                
+                const existingUser = document.querySelector(`[OpenID="${item.open_id}"]`);
+                if (existingUser) {
+                    updateUserElement(existingUser, item, true);
+                } else {
+                    MergedLineDiv.appendChild(createUserElement(item, true));
+                }
+            });
+        }
+
+        if (Array.isArray(jsonData.CommonLine)) {
+            jsonData.CommonLine.forEach(item => {
+                if (!item?.open_id) return;
+                
+                const existingUser = document.querySelector(`[OpenID="${item.open_id}"]`);
+                if (!existingUser) {
+                    MergedLineDiv.appendChild(createUserElement(item, false));
+                }
+            });
+        }
+        
+        updateQueueCount();
+        handleOverflow();
+        sortGiftUsers();
+    }
+
+    function detectingTheNumberOfUsers() {
+        const Http = new XMLHttpRequest();
+        Http.open("GET", "http://127.0.0.1:100/getLineLength");
+        Http.send();
+        Http.onreadystatechange = function() {
+            if (this.readyState === 4 && this.status === 200) {
+                try {
+                    const UserLength = Http.response;
+                    const lineSize = document.getElementById('LineSize');
+                    lineSize && (lineSize.textContent = "当前队列人数：" + UserLength);
+                    
+                    const frontendCount = document.getElementsByClassName('user').length;
+                    
+                    if (Math.abs(parseInt(UserLength) - frontendCount) > 2) {
+                        cleanAllUsers();
+                        getAllUsers();
+                    }
+                } catch (e) {
+                    console.error('处理队列长度时出错:', e);
+                }
+            }
+        };
+    }
+
+    function getAllUsers() {
+        const Http = new XMLHttpRequest();
+        Http.open("GET", "http://127.0.0.1:100/getAllLine");
+        Http.send();
+        Http.onreadystatechange = function() {
+            if (this.readyState === 4 && this.status === 200) {
+                try {
+                    const AllLine = JSON.parse(Http.response);
+                    addDataToPage(AllLine);
+                } catch (e) {
+                    console.error('解析用户数据失败:', e);
+                }
+            }
+        };
+    }
+
+    window.addEventListener('beforeunload', () => {
+        if (socket && socket.readyState === WebSocket.OPEN) {
+            socket.close();
+        }
+        reconnectTimer && clearTimeout(reconnectTimer);
+    });
+
+    getConfig();
+    getCss();
+    connect();
+</script>
+</body>
+</html>

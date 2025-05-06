@@ -1,0 +1,243 @@
+@font-face {
+    font-family: 'MaoKen';
+    src: url("/web/fonts/ChillRoundM.ttf") format("truetype");
+    font-weight: bold;
+    font-style: normal;
+}
+
+body {
+    width: 297px;
+    height: 660px;
+    margin: 0;
+    padding: 5px 0 0 0;
+    overflow: hidden;
+    font-family: 'MaoKen', -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    font-weight: bold;
+}
+
+/* 全局文字描边 */
+#toast,
+.user::before,
+.status-label,
+.GiftPrice {
+    text-shadow: 
+        -2px 0 0 #000,
+        0 2px 0 #000,
+        2px 0 0 #000,
+        0 -2px 0 #000,
+        -1.4px -1.4px 0 #000,
+        1.4px -1.4px 0 #000,
+        -1.4px 1.4px 0 #000,
+        1.4px 1.4px 0 #000;
+    color: #fff;
+    font-weight: bold;
+}
+
+/* LineSize单独描边 */
+#LineSize {
+    text-shadow: 
+        -2px 0 0 #0000ff,
+        0 2px 0 #0000ff,
+        2px 0 0 #0000ff,
+        0 -2px 0 #0000ff,
+        -1.4px -1.4px 0 #0000ff,
+        1.4px -1.4px 0 #0000ff,
+        -1.4px 1.4px 0 #0000ff,
+        1.4px 1.4px 0 #0000ff;
+    color: #fff;
+    font-weight: bold;
+}
+
+/* 用户名和编号描边 */
+.user-name,
+.user::before {
+    text-shadow: 
+        -2px 0 0 #000,
+        0 2px 0 #000,
+        2px 0 0 #000,
+        0 -2px 0 #000,
+        -1.4px -1.4px 0 #000,
+        1.4px -1.4px 0 #000,
+        -1.4px 1.4px 0 #000,
+        1.4px 1.4px 0 #000;
+    font-weight: bold;
+}
+
+/* 顶部信息 */
+#toast {
+    display: block;
+    text-align: center;
+    margin-bottom: 8px;
+    font-size: 30px;
+    letter-spacing: 0.3px;
+    font-weight: bold;
+}
+
+#LineSize {
+    display: block;
+    text-align: center;
+    margin-bottom: 5px;
+    font-size: 32px;
+    font-weight: bold;
+    color: #00ffff;
+}
+
+/* 确保列表容器有稳定的布局 */
+.Line {
+    height: calc(660px - 43px);
+    max-height: none;
+    overflow: hidden;
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+    padding-left: 0;
+    margin-left: 0;
+    -webkit-overflow-scrolling: touch;
+    will-change: transform;
+    contain: strict;
+    box-sizing: border-box;
+}
+
+.Line.scrollable {
+    overflow: auto;
+}
+
+/* Chrome/Safari隐藏滚动条 */
+.Line::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+}
+
+/* 用户项添加稳定的布局 */
+.user {
+    position: relative;
+    display: flex;
+    align-items: center;
+    height: 32px;
+    padding: 1px 1px 1px 0;
+    margin-bottom: 2px;
+    will-change: transform;
+    contain: content;
+    box-sizing: border-box;
+    min-height: 32px;
+}
+
+.user::before {
+    content: attr(data-index) ".";
+    position: relative;
+    display: inline-block;
+    font-size: 25px;
+    color: #FF69B4;
+    white-space: nowrap;
+    margin-right: 0;
+    flex-shrink: 0;
+    margin-left: 0;
+    padding-left: 0;
+}
+
+/* 修改点1：增加更具体的img选择器 */
+.user img:not(.battery-icon) {
+    width: 27px;
+    height: 27px;
+    border-radius: 50%;
+    margin: 0 0px 0 3px;
+    object-fit: cover;
+    border: 0.5px solid rgba(0,0,0,0.1);
+}
+
+.user > div {
+    display: flex;
+    align-items: center;
+    margin-left: 3px;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    font-weight: bold;
+}
+
+.user-name {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-right: 4px;
+    font-weight: bold;
+    letter-spacing: 0.2px;
+    font-size: 26px;
+    color: #FF69B4;
+    line-height: 1.2;
+    padding-left: 2px;
+}
+
+/* 状态标签 */
+.status-label {
+    font-size: 28px;
+    white-space: nowrap;
+    flex-shrink: 0;
+    padding-left: 2px;
+    color: #ffffff;
+    font-weight: normal !important;
+}
+
+.GiftPrice {
+    font-size: 12px;
+    margin-left: 5px;
+    color: #ffd166;
+    font-weight: bold;
+}
+
+#bottomTag {
+    display: block;
+    height: 1px;
+    visibility: hidden;
+}
+
+/* 礼物价格容器 */
+.gift-price-container {
+    display: flex;
+    align-items: center;
+    margin-left: 5px;
+}
+
+.price-value {
+    font-size: 22px;
+    color: #fffb00;
+    font-weight: bold;
+    text-shadow: 
+    -2px 0 0 #000,
+    0 2px 0 #000,
+    2px 0 0 #000,
+    0 -2px 0 #000,
+    -1.5px -1.5px 0 #000,
+    1.5px -1.5px 0 #000,
+    -1.5px 1.5px 0 #000,
+    1.5px 1.5px 0 #000,
+    /* 内层深灰增强 */
+    -1px 0 0 #333,
+    0 1px 0 #333,
+    1px 0 0 #333,
+    0 -1px 0 #333;
+}
+
+/* 修改点2：提高电池图标选择器特异性 */
+.battery-icon,
+.user .battery-icon,
+.user img.battery-icon {
+    width: 19px;
+    height: 19px;
+    margin-left: 3px;
+    margin-top: 1px;
+    border-radius: 0 !important;
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+}
+
+.Gift .battery-icon {
+    filter: drop-shadow(-1px 0 0 #000) 
+            drop-shadow(0 1px 0 #000)
+            drop-shadow(1px 0 0 #000)
+            drop-shadow(0 -1px 0 #000)
+            hue-rotate(10deg) brightness(1.1);
+}
