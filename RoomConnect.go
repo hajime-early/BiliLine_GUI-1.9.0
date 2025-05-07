@@ -2,13 +2,9 @@ package main
 
 import (
 	"fmt"
-	"reflect"
 	"regexp"
-	"runtime/debug"
 	"sort"
-	"strconv"
 	"sync"
-	"time"
 
 	"golang.org/x/exp/slog"
 
@@ -108,114 +104,50 @@ func messageHandle(ws *basic.WsClient, msg *proto.Message) error {
 }
 
 var (
-	AccessSecret        = "你的access_key_id"
+	AccessSecret        = "AccessSecret"
 	AppID         int64 = 123456789
-	AccessKey           = "你的access_key_secred"
+	AccessKey           = "AccessKey"
 	CurrentIdCode string
 )
 
 func RoomConnect(IdCode string) (AppClient *live.Client, GameId string, WsClient *basic.WsClient, HeartbeatCloseChan chan bool) {
-	slog.Info("开始创建新连接",
-		slog.String("当前ID码", IdCode),
-		slog.String("调用栈", string(debug.Stack()))) // 新增调用栈信息
+	//	初始化应用连接信息配置，自编译请申明以下3个值
 	LinkConfig := live.NewConfig(AccessKey, AccessSecret, AppID)
+
+	//	创建Api连接实例
 	client := live.NewClient(LinkConfig)
-	CurrentIdCode = IdCode // 保存当前 ID 供后续重连使用
+	//	开始身份码认证流程
 
 	AppStart, err := client.AppStart(IdCode)
+	RoomId = AppStart.AnchorInfo.RoomID
 	if err != nil {
 		slog.Error("应用流程开启失败", err)
 		return nil, "", nil, nil
 	}
-
-	// 检查AppStart是否为零值
-	if reflect.ValueOf(AppStart).IsZero() {
-		slog.Error("AppStart返回为零值")
-		return nil, "", nil, nil
-	}
-
-	// 使用反射检查AnchorInfo是否为零值
-	if reflect.ValueOf(AppStart.AnchorInfo).IsZero() {
-		slog.Error("AnchorInfo为零值")
-		return nil, "", nil, nil
-	}
-
-	RoomId = AppStart.AnchorInfo.RoomID
-
+	// 开启心跳
 	HeartbeatCloseChan = make(chan bool, 1)
 	NewHeartbeat(client, AppStart.GameInfo.GameID, HeartbeatCloseChan)
 
 	dispatcherHandleMap := basic.DispatcherHandleMap{
 		proto.OperationMessage: messageHandle,
 	}
-
-	// 修改后的onCloseCallback回调函数
 	onCloseCallback := func(wcs *basic.WsClient, startResp basic.StartResp, closeType int) {
-
-		slog.Info("连接关闭事件触发",
-			slog.String("当前GameId", GameId),
-			slog.String("房间ID", strconv.Itoa(RoomId)),
-			slog.String("ID码", CurrentIdCode)) // 新增关闭时关键参数日志
-
-		// 异步延迟重连逻辑
-		go func() {
-			// 记录旧GameId用于对比
-			previousGameId := GameId
-			retryInterval := time.Millisecond * 500 // 修改点1：初始间隔从1秒改为500毫秒
-
-			// 修改点1：将重试次数从4次减少到3次
-			for i := 0; i < 3; i++ {
-				time.Sleep(retryInterval)
-
-				slog.Info("重试连接中...",
-					slog.Int("尝试次数", i+1),
-					slog.String("旧GameId", previousGameId),
-					slog.String("当前ID码", CurrentIdCode))
-
-				// 创建新连接
-				newClient, newGameId, newWsClient, newHeartbeatChan := RoomConnect(IdCode)
-				if newClient != nil {
-					lineMu.Lock()
-					// 新增旧心跳通道关闭逻辑
-					if HeartbeatCloseChan != nil {
-						close(HeartbeatCloseChan) // 关闭旧心跳通道
-					}
-					// 添加重连验证日志
-					slog.Info("重连参数验证",
-						slog.String("旧GameId", previousGameId),
-						slog.String("新GameId", newGameId),
-						slog.String("房间ID", strconv.Itoa(RoomId)),
-						slog.String("ID码", CurrentIdCode))
-
-					// 安全更新全局变量
-					AppClient = newClient
-					GameId = newGameId
-					WsClient = newWsClient
-					HeartbeatCloseChan = newHeartbeatChan
-					lineMu.Unlock()
-
-					slog.Info("重连成功",
-						slog.String("新GameId", newGameId),
-						slog.Bool("房间ID一致", RoomId == AppStart.AnchorInfo.RoomID)) // 新增一致性检查
-					return
-				}
-				// 修改点2：优化退避策略系数为1.4
-				retryInterval = time.Duration(float64(retryInterval) * 1.4)
-			}
-
-			// 修改点3：更新错误日志提示次数
-			slog.Error("重连失败，达到最大尝试次数（3次）",
-				slog.String("最后尝试的ID码", CurrentIdCode),
-				slog.String("房间ID", strconv.Itoa(RoomId)))
-		}()
+		slog.Info("WebsocketClient onClose", startResp)
+		// 注意检查关闭类型, 避免无限重连
+		if closeType == live.CloseReceivedShutdownMessage || closeType == live.CloseAuthFailed {
+			slog.Info("WebsocketClient exit")
+			return
+		}
+		err := wcs.Reconnection(startResp)
+		if err != nil {
+			slog.Error("Reconnection fail", err)
+		}
 	}
-
+	// 一键开启websocket
 	wsClient, err := basic.StartWebsocket(AppStart, dispatcherHandleMap, onCloseCallback, logger)
 	if err != nil {
-		slog.Error("WebSocket启动失败", err)
-		return nil, "", nil, nil
+		panic(err)
 	}
-
 	return client, AppStart.GameInfo.GameID, wsClient, HeartbeatCloseChan
 }
 
