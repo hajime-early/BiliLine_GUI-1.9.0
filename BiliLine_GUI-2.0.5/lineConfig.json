@@ -1,0 +1,36 @@
+{
+ "IdCode": "BJQI9CZVPKOW3",
+ "GuardPrintColor": {
+  "R": 4626,
+  "G": 37522,
+  "B": 3598
+ },
+ "GiftPrintColor": {
+  "R": 14906,
+  "G": 38550,
+  "B": 56797
+ },
+ "GiftLinePrice": 1,
+ "CommonPrintColor": {
+  "R": 58853,
+  "G": 13107,
+  "B": 60395
+ },
+ "DmDisplayColor": {
+  "R": 65535,
+  "G": 65535,
+  "B": 65535
+ },
+ "LineKey": "排队",
+ "GiftPriceDisplay": false,
+ "IsOnlyGift": false,
+ "AutoJoinGiftLine": true,
+ "TransparentBackground": true,
+ "CurrentQueueSizeDisplay": true,
+ "MaxLineCount": 10,
+ "EnableMusicServer": false,
+ "DmDisplayNoSleep": false,
+ "ScrollInterval": 20,
+ "AutoScrollLine": true,
+ "SpecialUserList": null
+}

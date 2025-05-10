@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="referrer" content="never">
+    <title>弹幕显示</title>
+
+
+    <style>
+    @keyframes fadeIn {
+        from {
+            transform: translateY(10px);
+            opacity: 0;
+        }
+        to {
+            transform: translateY(0px);
+            opacity: 1;
+        }
+    }
+
+    .user {
+        animation: fadeIn 0.5s ease-in-out;
+        display: flex;
+        align-items: center;
+        background: linear-gradient(135deg, #f6d365 0%, #fda085 100%);
+        border-radius: 10px;
+        padding: 10px;
+        margin: 10px 0;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .avatar img {
+        display: flex;
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+        border: 2px solid #fff;
+    }
+
+
+    .userName a {
+        color: white;
+        text-shadow: -1px -1px 0 #000000, 1px -1px 0 black, -1px 1px 0 black, 1px 1px 0 black;
+        font-weight: bold;
+        margin-right: 5px;
+    }
+
+
+
+    .Dm {
+        margin-left: 5px;
+        font-weight: bold;
+        color: sienna;
+        background: rgba(255, 255, 255, 0.8);
+        padding: 5px 10px;
+        border-radius: 5px;
+    }
+
+    .EmojiImg img {
+        height: 40px;
+    }
+
+
+    .userName a {
+        white-space: nowrap;
+        vertical-align: top;
+    }
+
+    .fansMedal{
+        display: flex;
+    }
+
+    .fansMedal div {
+        font-size: 10px;
+    }
+
+    .fansMedalLevel {
+        font-size: 10px;
+        color: black;
+        background: #ffffff;
+        padding: 2px 5px;
+        border-bottom-right-radius: 5px;
+        border-top-right-radius: 5px;
+    }
+
+    .FansMedalText{
+        color: #ffffff;
+        padding: 2px 5px;
+        border-top-left-radius: 5px;
+        border-bottom-left-radius: 5px;
+    }
+
+
+</style>
+</head>
+<body>
+<script src="/NoSleep.min.js"></script>
+<div id="app">
+    <div class="user">
+        <div class="avatar">
+            <img src="https://i2.hdslb.com/bfs/face/77c57a7b660b222460e738f639cdb600cb98ed4c.jpg">
+        </div>
+
+        <div class="UserInfoBox">
+            <div class="fansMedal">
+                <div class="FansMedalText">测试粉丝牌</div>
+                <div class="fansMedalLevel">16</div>
+            </div>
+            <div class="userName">
+                <a>普通用户</a>
+                <a>:</a>
+            </div>
+        </div>
+
+
+        <div class="Dm">
+            <a>这是一条弹幕</a>
+        </div>
+        <div class="EmojiImg">
+            <img src="http://i0.hdslb.com/bfs/emote/1e0cbe36d039b412f76fd72b3c86c0261a8aa521.png">
+        </div>
+    </div>
+</div>
+<script>
+    const fansMedalColors = {
+        1: "#5b958e",
+        2: "#5b958e",
+        3: "#5b958e",
+        4: "#5b958e",
+        5: "#5c7a9e",
+        6: "#5c7a9e",
+        7: "#5c7a9e",
+        8: "#5c7a9e",
+        9: "#8c7ba6",
+        10: "#8c7ba6",
+        11: "#8c7ba6",
+        12: "#8c7ba6",
+        13: "#bc6586",
+        14: "#bc6586",
+        15: "#bc6586",
+        16: "#bc6586",
+        17: "#c59c25",
+        18: "#c59c25",
+        19: "#c59c25",
+        20: "#c59c25",
+        21: "linear-gradient(to right, rgba(29, 86, 79, 1), rgba(29, 86, 79, 0))",
+        22: "linear-gradient(to right, rgba(29, 86, 79, 1), rgba(29, 86, 79, 0))",
+        23: "linear-gradient(to right, rgba(29, 86, 79, 1), rgba(29, 86, 79, 0))",
+        24: "linear-gradient(to right, rgba(29, 86, 79, 1), rgba(29, 86, 79, 0))",
+        25: "linear-gradient(to right, rgba(12, 28, 86, 1), rgba(12, 28, 86, 0))",
+        26: "linear-gradient(to right, rgba(12, 28, 86, 1), rgba(12, 28, 86, 0))",
+        27: "linear-gradient(to right, rgba(12, 28, 86, 1), rgba(12, 28, 86, 0))",
+        28: "linear-gradient(to right, rgba(12, 28, 86, 1), rgba(12, 28, 86, 0))",
+    };
+
+
+    let Host = window.location.host
+
+    Host = "127.0.0.1:100"
+
+    function addUserStructure(AvatarURL, UserName, DmText, DmType) {
+        // 创建父容器 <div class="user">
+        const userDiv = document.createElement("div");
+        userDiv.className = "user";
+
+        // 创建头像容器 <div class="avatar">
+        const avatarDiv = document.createElement("div");
+        avatarDiv.className = "avatar";
+
+        // 创建头像图片 <img src="...">
+        const avatarImg = document.createElement("img");
+        avatarImg.src = AvatarURL;
+
+        // 将头像图片添加到头像容器
+        avatarDiv.appendChild(avatarImg);
+
+        // 创建用户名容器 <div class="userName">
+        const userNameDiv = document.createElement("div");
+        userNameDiv.className = "userName";
+
+        // 创建普通用户链接 <a>普通用户</a>
+        const userLink = document.createElement("a");
+        userLink.textContent = UserName;
+
+        // 创建冒号元素 <a>:</a>
+        const colonSpan = document.createElement("a");
+        colonSpan.textContent = " :";
+
+        // 将普通用户链接和冒号元素添加到用户名容器
+        userNameDiv.appendChild(userLink);
+        userNameDiv.appendChild(colonSpan);
+
+        // 将头像容器、用户名容器和弹幕容器添加到父容器
+        userDiv.appendChild(avatarDiv);
+        userDiv.appendChild(userNameDiv);
+
+        if (DmType) {
+            // 创建弹幕图片容器 <div class="EmojiImg">
+            const EmojiImgDiv = document.createElement("div");
+            EmojiImgDiv.className = "EmojiImg";
+
+            // 创建弹幕图片 <img src="...">
+            const EmojiImg = document.createElement("img");
+            EmojiImg.src = DmText;
+
+            // 将弹幕图片添加到弹幕图片容器
+            EmojiImgDiv.appendChild(EmojiImg);
+
+            // 将弹幕图片容器添加到父容器
+            userDiv.appendChild(EmojiImgDiv);
+        } else {
+            // 创建弹幕容器 <div class="Dm">
+            const dmDiv = document.createElement("div");
+            dmDiv.className = "Dm";
+
+            // 创建弹幕链接 <a>这是一条弹幕</a>
+            const dmLink = document.createElement("a");
+            dmLink.textContent = DmText;
+
+            // 将弹幕链接添加到弹幕容器
+            dmDiv.appendChild(dmLink);
+
+            userDiv.appendChild(dmDiv);
+        }
+
+
+
+        // 将父容器添加到适当位置
+        const container = document.getElementById("app");
+        container.appendChild(userDiv);
+
+        window.scrollTo(0, document.body.scrollHeight);
+    }
+
+    function DelEarliestDm() {
+        let DmList = document.getElementsByClassName("user")
+        if (DmList.length > 50) {
+            DmList[0].remove()
+        }
+    }
+
+    setInterval(DelEarliestDm, 500)
+</script>
+<script>
+
+    function connect() {
+        let DmSocket = new WebSocket(`ws://${Host}/DmWs`)
+
+        DmSocket.onmessage = (event) => {
+            let ReceiverDmDate = JSON.parse(event.data)
+            if (!ReceiverDmDate.dm_type) {
+                console.log("收到一条弹幕")
+                addUserStructure(ReceiverDmDate.uface, ReceiverDmDate.uname, ReceiverDmDate.msg, ReceiverDmDate.dm_type)
+                console.log(ReceiverDmDate.uface, ReceiverDmDate.uname, ReceiverDmDate.msg, ReceiverDmDate.dm_type)
+            } else {
+                console.log("收到一个表情包")
+                addUserStructure(ReceiverDmDate.uface, ReceiverDmDate.uname, ReceiverDmDate.emoji_img_url, ReceiverDmDate.dm_type)
+                console.log(ReceiverDmDate.uface, ReceiverDmDate.uname, ReceiverDmDate.emoji_img_url, ReceiverDmDate.dm_type)
+            }
+
+        }
+
+        DmSocket.onclose = () => {
+            console.log("连接断开，将在5秒后尝试重新连接")
+            setTimeout(connect, 5000)
+        }
+    }
+
+    connect()
+    const noSleep = new NoSleep();
+
+    function GetConfig(){
+        const Http = new XMLHttpRequest();
+        const Url = `http://${Host}/getConfig`;
+        Http.open("GET",Url)
+        Http.send()
+        Http.onreadystatechange=function (){
+            if (this.readyState===4&&this.status===200){
+                let Config = JSON.parse(Http.responseText)
+                if (Config.DmDisplayNoSleep){
+                    noSleep.enable();
+                }
+            }
+        }
+    }
+
+
+    document.addEventListener('click', function enableNoSleep() {
+        document.removeEventListener('click', enableNoSleep, false);
+        prompt('点击确定以保持屏幕常亮');
+        GetConfig()
+    }, false);
+</script>
+</body>
+</html>

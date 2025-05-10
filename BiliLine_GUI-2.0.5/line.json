@@ -1,0 +1,76 @@
+{
+ "GiftLine": [
+  {
+   "open_id": "useropenidabcdefghigklmnopqrstuvwxyz",
+   "UserName": "这是一个名字很长的用户呀很长很长",
+   "Avatar": "http://i0.hdslb.com/bfs/face/4add3acfc930fcd07d06ea5e10a3a377314141c2.jpg",
+   "PrintColor": {
+    "R": 14906,
+    "G": 38550,
+    "B": 56797
+   },
+   "GiftName": "探索者启航",
+   "GiftPrice": 2333.3,
+   "is_online": true
+  },
+  {
+   "open_id": "useropenidabcdefgh412341234igklmnopqrstuvwxyz",
+   "UserName": "这是一个名字645634很长的用户呀很长很长",
+   "Avatar": "http://i0.hdslb.com/bfs/face/4add3acfc930fcd07d06ea5e10a3a377314141c2.jpg",
+   "PrintColor": {
+    "R": 14906,
+    "G": 38550,
+    "B": 56797
+   },
+   "GiftName": "探索者启航",
+   "GiftPrice": 266.3,
+   "is_online": true
+  },
+  {
+   "open_id": "useropenidab4123412cdefghigklmnopq774567rstuvwxyz",
+   "UserName": "这是一个名字很5123512长的用户呀很长很长",
+   "Avatar": "http://i0.hdslb.com/bfs/face/4add3acfc930fcd07d06ea5e10a3a377314141c2.jpg",
+   "PrintColor": {
+    "R": 14906,
+    "G": 38550,
+    "B": 56797
+   },
+   "GiftName": "探索者启航",
+   "GiftPrice": 233.3,
+   "is_online": true
+  }
+ ],
+ "CommonLine": [
+  {
+   "open_id": "8741bdbca27c4900bb143a1327d07976",
+   "UserName": "原神绝区零代肝-hajime",
+   "Avatar": "https://i0.hdslb.com/bfs/face/59c01d2e049a4cfaf276c055e9b65763021bf969.jpg",
+   "PrintColor": {
+    "R": 58853,
+    "G": 13107,
+    "B": 60395
+   },
+   "is_online": true
+  },
+  {
+   "open_id": "0bfd186857954643b2458e4eda4418f9",
+   "UserName": "孤独的hajime",
+   "Avatar": "https://i1.hdslb.com/bfs/face/a1033b0c7d16231bbed262beb9b02ed0bb70312d.jpg",
+   "PrintColor": {
+    "R": 58853,
+    "G": 13107,
+    "B": 60395
+   },
+   "is_online": true
+  }
+ ],
+ "GiftIndex": {
+  "useropenidab4123412cdefghigklmnopq774567rstuvwxyz": 3,
+  "useropenidabcdefgh412341234igklmnopqrstuvwxyz": 2,
+  "useropenidabcdefghigklmnopqrstuvwxyz": 1
+ },
+ "CommonIndex": {
+  "0bfd186857954643b2458e4eda4418f9": 2,
+  "8741bdbca27c4900bb143a1327d07976": 1
+ }
+}
